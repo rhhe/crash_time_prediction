@@ -1,2 +1,2 @@
 # crash_time_prediction
-Predict crash time with log infomation.
+Predict crash time with log information.
