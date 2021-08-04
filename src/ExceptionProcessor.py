@@ -1,6 +1,6 @@
 import logging
 
-from time_tools import TimeTools
+from TimeTools import TimeTools
 
 
 class ExceptionProcessor:
