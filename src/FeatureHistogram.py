@@ -1,5 +1,8 @@
 import copy
+import json
 import sys
+
+import numpy
 import pandas
 
 from Const import Const
@@ -26,14 +29,18 @@ class Sample:
         sample_data_list: [Sample] = []
         print("Info: label file shape", pd_data.shape)
         n_row = pd_data.shape[0]
+        # nc_ip_last = ""
         for i_row in range(n_row):
             if i_row % 50000 == 0:
                 print("Info: Label {}/{} is read.".format(i_row, n_row))
-            if i_row == 50000:
-                break
             nc_ip = pd_data.iloc[i_row]["nc_ip"]
+            # if nc_ip == nc_ip_last:
+            #     continue
+            # nc_ip_last = nc_ip
             sample_time_hour = TimeTools.time_str_to_hour(pd_data.iloc[i_row]["sample_time"])
             nc_down_label = pd_data.iloc[i_row]["nc_down_label"]
+            if numpy.isnan(nc_down_label):
+                nc_down_label = False
             sample_data_list.append(Sample(nc_ip, sample_time_hour, nc_down_label))
         return sample_data_list
 
@@ -83,12 +90,14 @@ class FeatureHistogram(Sample):
         cls._exception_type_list.sort()
         return cls._exception_type_list
 
-    def __init__(self, sample: Sample):
+    def __init__(self, sample: Sample, down_info_mapper: dict = None):
         """
         :param sample: 抽样类实例
         """
         super().__init__(sample.nc_ip, sample.sample_time_hour,
                          sample.nc_down_label, sample.nc_down_time_hour)
+        if down_info_mapper is not None:
+            self.nc_down_time_hour = down_info_mapper.get(self.nc_ip)
         self._refresh_down_time()
         self._exception_type_to_histogram_mapper: dict = {}
 
@@ -98,7 +107,10 @@ class FeatureHistogram(Sample):
         :return:
         """
         if self.nc_down_time_hour is None:
-            self.nc_down_time_hour = self.sample_time_hour + Const.N_HOUR_PER_MONTH
+            if self.nc_down_label:
+                self.nc_down_time_hour = self.sample_time_hour + 24.0
+            else:
+                self.nc_down_time_hour = self.sample_time_hour + Const.N_HOUR_PER_MONTH
 
     def fill_exception(self, exception_type_name: str, exception_time_hour: float) -> None:
         """
@@ -144,8 +156,18 @@ class FeatureHistogram(Sample):
             FeatureHistogram._exception_type_set.add(exception_type)
 
     @staticmethod
-    def make_exception_type_list():
+    def make_exception_type_list(file_name: str = None):
         FeatureHistogram._exception_type_list = [o for o in FeatureHistogram._exception_type_set]
+        FeatureHistogram._exception_type_list.sort()
+        if file_name is None:
+            return
+        with open(file_name, mode='w', encoding='utf-8') as fp:
+            json.dump(FeatureHistogram._exception_type_list, fp, ensure_ascii=False)
+
+    @staticmethod
+    def read_exception_type_list(file_name: str):
+        with open(file_name, mode='r', encoding='utf-8') as fp:
+            FeatureHistogram._exception_type_list = json.load(fp)
 
     @staticmethod
     def get_feature_names():
@@ -167,6 +189,8 @@ class FeatureHistogram(Sample):
         return features
 
     def get_delta_time_hour(self):
+        if self.nc_down_time_hour is None or self.sample_time_hour is None:
+            return 720.0
         return self.nc_down_time_hour - self.sample_time_hour
 
 

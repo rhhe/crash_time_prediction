@@ -11,10 +11,10 @@ class DownInfoProcessor:
 
     def read_down_info_csv_file(self, file_path: str):
         pd_data = pandas.read_csv(file_path)
-        for row in pd_data:
-            nc_ip = row["nc_ip"]
-            down_time_hour = TimeTools.time_str_to_hour(row["down_start_time"])
-            self.nc_to_down_time_hour_mapper[nc_ip] = down_time_hour
+        n_row = pd_data.shape[0]
+        for i_row in range(n_row):
+            nc_ip = pd_data.iloc[i_row]["nc_ip"]
+            self.nc_to_down_time_hour_mapper[nc_ip] = TimeTools.time_str_to_hour(pd_data.iloc[i_row]["down_start_time"])
 
     def get_nc_to_down_time_hour_mapper(self) -> dict:
         return self.nc_to_down_time_hour_mapper
