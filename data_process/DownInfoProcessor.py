@@ -1,6 +1,6 @@
 import pandas
 
-from TimeTools import TimeTools
+from utils.TimeTools import TimeTools
 
 
 class DownInfoProcessor:

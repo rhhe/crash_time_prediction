@@ -82,13 +82,3 @@ class NcInfoProcessor:
     def get_features(self, nc_ip: str):
         res = self.ip_to_features_mapper.get(nc_ip)
         return [0 for _ in range(10)] if res is None else res
-
-
-def _test():
-    nc_info_processor = NcInfoProcessor("../data/train/nc_info.csv")
-    for o in nc_info_processor.ip_to_info_mapper.items():
-        print(o[0], o[1].__dict__)
-
-
-if __name__ == '__main__':
-    _test()

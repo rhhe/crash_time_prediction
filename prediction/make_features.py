@@ -1,11 +1,10 @@
 import pandas
 
-from src.TimeTools import TimeTools
-from src.Param import Param
-from src.ExceptionProcessor import ExceptionProcessor
-from src.DownInfoProcessor import DownInfoProcessor
-from src.NcInfoProcessor import NcInfoProcessor, NcInfo
-from src.FeatureHistogram import FeatureHistogram, Sample
+from utils.Param import Param
+from data_process.ExceptionProcessor import ExceptionProcessor
+from data_process.DownInfoProcessor import DownInfoProcessor
+from data_process.NcInfoProcessor import NcInfoProcessor, NcInfo
+from prediction.FeatureHistogram import FeatureHistogram, Sample
 
 
 def _make_ip_to_sample_index_list_mapper(samples: [Sample]) -> {str: [int]}:
@@ -64,8 +63,3 @@ def make_features(is_train: bool):
     cols: [str] = ["delta_hour"] + NcInfo.get_feature_names() + FeatureHistogram.get_feature_names()
     df = pandas.DataFrame(columns=cols, data=data_list)
     df.to_csv(Param.feature_train_file if is_train else Param.feature_test_file, encoding='utf-8')
-
-
-if __name__ == '__main__':
-    # make_features(is_train=True)
-    make_features(is_train=False)

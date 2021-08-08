@@ -4,7 +4,7 @@ import xgboost as xgb
 import numpy as np
 import pandas as pd
 
-from src.Param import Param
+from utils.Param import Param
 
 
 def train_and_test():
@@ -45,10 +45,6 @@ def train_and_test():
     with open(Param.test_label, mode='r', encoding='utf-8') as fp:
         lines = fp.readlines()[1:]
     lines = [lines[i] for i in i_label_list_break_down]
-    lines = [",".join(o.split(",")[0:2])+"\n" for o in lines]
+    lines = [",".join(o.split(",")[0:2]) + "\n" for o in lines]
     with open(Param.res_file, mode='w', encoding='utf-8') as fp_out:
         fp_out.writelines(lines)
-
-
-if __name__ == '__main__':
-    train_and_test()
