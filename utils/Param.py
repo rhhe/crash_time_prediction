@@ -13,7 +13,7 @@ class Param:
     test_exception: str = "./data/test/round1_B_test_nc_exceptions.csv"
     test_info: str = "./data/test/round1_B_test_nc_info.csv"
     feature_test_file: str = "./data/feature_test_B.csv"
-    res_file: str = "./data/res_b.csv"
+    res_file: str = "./submit/res_b.csv"
 
     train_down: str = "./data/train/nc_down.csv"
     histogram_bins: [float] = [0.0, 1.0, 2.0, 4.0, 8.0, 24.0, 48.0]
