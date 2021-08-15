@@ -8,4 +8,4 @@ class TimeTools:
 
     @staticmethod
     def time_str_to_hour(time_str: str) -> float:
-        return datetime.strptime(time_str.split('.')[0], Const.TIME_FORMAT).timestamp() / Const.N_MILLISECOND_PER_HOUR
+        return datetime.strptime(time_str.split('.')[0], Const.TIME_FORMAT).timestamp() / 3600
