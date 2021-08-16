@@ -6,5 +6,6 @@
 int main() {
     std::cout << "Hello, World!" << std::endl;
     FeatureMaker::make_train_feature();
+    FeatureMaker::make_test_feature();
     return 0;
 }

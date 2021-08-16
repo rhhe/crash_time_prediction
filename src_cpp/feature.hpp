@@ -20,20 +20,21 @@ public:
     std::string nc_ip{};
     int sample_hour = 0;
     short label = -1;
-    std::vector<std::vector<int>> hist{};
+    std::vector<int> hist{};
     std::vector<int> info;
 public:
     Feature() {
-        hist.resize(N_HIST, std::vector<int>(N_BIN, 0));
+        hist.clear();
+        hist.resize(N_BIN * N_HIST, 0);
         info.resize(N_INFO, -1);
     }
 
-    bool Fill(const int &except_type, const int &except_hour_minus_sample_hour) {
-        if (except_type < 0 || except_type >= N_HIST) { return false; }
-        if (except_hour_minus_sample_hour < BINS.front()) { return false; }
-        if (except_hour_minus_sample_hour >= BINS.back()) {
-            this->hist[except_type][N_BIN_MINUS_1]++;
-            return true;
+    void Fill(const int &except_type, const int &except_hour_minus_sample_hour) {
+        if (except_type < 0 || except_type >= N_HIST) { return; }
+        if (except_hour_minus_sample_hour < BINS_FRONT) { return; }
+        if (except_hour_minus_sample_hour >= BINS_BACK) {
+            hist[except_type * N_BIN + N_BIN_MINUS_1]++;
+            return;
         }
         i = 0, j = N_BIN_MINUS_1;
         while (j - i > 1) {
@@ -42,8 +43,7 @@ public:
                 j = mid;
             } else { i = mid; }
         }
-        this->hist[except_type][i]++;
-        return true;
+        hist[except_type * N_BIN + i]++;
     }
 
     static std::string ToCsvHead() {
@@ -72,9 +72,7 @@ public:
         ss << label << ","
            << nc_ip << ",";
         std::copy(info.begin(), info.end(), std::ostream_iterator<int>(ss, ","));
-        std::for_each(hist.begin(), hist.end(), [&](const std::vector<int> &o) -> void {
-            std::copy(o.begin(), o.end(), std::ostream_iterator<int>(ss, ","));
-        });
+        std::copy(hist.begin(), hist.end(), std::ostream_iterator<int>(ss, ","));
         return ss.str().substr(0, ss.str().length() - 1);
     }
 
@@ -121,6 +119,37 @@ public:
         fp_label.close();
     };
 
+    //! read data -> train data -> sample label -> feature instances
+    void ReadLabelWithLessFalseLabel(const std::string &label_file) {
+        std::cout << "read sample data: " << label_file << std::endl;
+        std::ifstream fp_label(label_file);
+        if (!fp_label) {
+            std::cout << "open file failed: " << label_file << std::endl;
+            throw std::runtime_error("open file failed: " + label_file);
+        }
+        std::string line{};
+        std::getline(fp_label, line);
+        std::cout << line << std::endl;
+        Feature f;
+        int i_false = 0;
+        while (!fp_label.eof()) {
+//            std::cout << "line: " << line << std::endl;
+            std::getline(fp_label, line);
+            if (line.empty()) { break; }
+            DataProcess::parse_label(line, f.nc_ip, f.sample_hour, f.label);
+//            std::cout << f.nc_ip << "~" << f.sample_hour << "~" << f.label << std::endl;
+            if (f.label == 0) {
+                if ((i_false % 500) == 0) {
+                    features.push_back(f);
+                }
+            } else {
+                features.push_back(f);
+            }
+            i_false++;
+        }
+        fp_label.close();
+    };
+
     //! feature instances -> nc_ip to i_feature_list mapper
     void MakeIpToFeaturesMapper() {
         std::cout << "make ip-to-iFeatures mapper." << std::endl;
@@ -131,11 +160,6 @@ public:
             }
             ip_to_iFeatures_mapper[k].push_back(i_f);
         }
-//        for (const auto &item: ip_to_iFeatures_mapper) {
-//            std::cout << item.first << ":";
-//            std::copy(item.second.begin(), item.second.end(), std::ostream_iterator<int>(std::cout, ","));
-//            std::cout << std::endl;
-//        }
     }
 
     //! read data -> train data -> nc info -> add to feature instances
@@ -184,7 +208,7 @@ public:
         std::string content{};
         int i_row = 0;
         while (!fp_train_exception.eof()) {
-            if ((i_row % 100000) == 0) { std::cout << "fp_train_exception: " << i_row << std::endl; }
+            if ((i_row % 10000) == 0) { std::cout << "fp_exception: " << i_row << std::endl; }
             i_row++;
             std::getline(fp_train_exception, line);
 //            std::cout << line << std::endl;
@@ -193,9 +217,8 @@ public:
 //            std::cout << nc_ip << "," << exception_type << "," << exception_hour << std::endl;
             auto iter = ip_to_iFeatures_mapper.find(nc_ip);
             if (iter == ip_to_iFeatures_mapper.end()) { continue; }
-            for (const auto i_f : iter->second) {
-                auto &f = features[i_f];
-                f.Fill(exception_type, exception_hour - f.sample_hour);
+            for (const auto &i_f : iter->second) {
+                features[i_f].Fill(exception_type, exception_hour - features[i_f].sample_hour);
             }
         }
         fp_train_exception.close();
@@ -203,7 +226,7 @@ public:
 
     //! write data -> train data -> label + features.
     void WriteToFile(const std::string &file_name) {
-        std::cout << "write train features to file: " << file_name << "." << std::endl;
+        std::cout << "write features to file: " << file_name << "." << std::endl;
         std::ofstream fp_out(file_name);
         fp_out << Feature::ToCsvHead() << std::endl;
         for (const auto &f: features) {
@@ -214,12 +237,22 @@ public:
 
     static void make_train_feature() {
         FeatureMaker featureMaker;
-        FeatureMaker::UpdateNHistWithExceptionFile();
-        featureMaker.ReadLabel(FILE_TRAIN_LABEL);
+//        FeatureMaker::UpdateNHistWithExceptionFile();
+        featureMaker.ReadLabelWithLessFalseLabel(FILE_TRAIN_LABEL);
         featureMaker.MakeIpToFeaturesMapper();
         featureMaker.ReadNCInfo(FILE_TRAIN_INFO);
         featureMaker.FillExceptionInfoHist(FILE_TRAIN_EXCEPTION);
         featureMaker.WriteToFile(FILE_TRAIN_FEATURE);
+    }
+
+    static void make_test_feature() {
+        FeatureMaker featureMaker;
+//        FeatureMaker::UpdateNHistWithExceptionFile();
+        featureMaker.ReadLabel(FILE_TEST_LABEL);
+        featureMaker.MakeIpToFeaturesMapper();
+        featureMaker.ReadNCInfo(FILE_TEST_INFO);
+        featureMaker.FillExceptionInfoHist(FILE_TEST_EXCEPTION);
+        featureMaker.WriteToFile(FILE_TEST_FEATURE);
     }
 };
 
