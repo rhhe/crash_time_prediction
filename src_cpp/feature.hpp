@@ -86,7 +86,8 @@ private:
 class FeatureMaker {
 protected:
     std::vector<Feature> features;
-    std::unordered_map<std::string, std::vector<int>> ip_to_iFeatures_mapper;
+    std::unordered_map<std::string, std::vector<int>> ip_to_iFeatures_mapper{};
+    std::unordered_map<std::string, std::vector<std::vector<int>>> ip_to_exception_hour_mapper{};
 
 public:
     //! read data -> train data -> exception -> types
@@ -162,6 +163,15 @@ public:
         }
     }
 
+    void MakeIpToHourListMapper() {
+        std::vector<std::string> ip_list{};
+        std::for_each(features.begin(), features.end(), [&](const Feature &f) { ip_list.push_back(f.nc_ip); });
+        std::sort(ip_list.begin(), ip_list.end());
+        for (const auto &ip: ip_list) {
+            ip_to_exception_hour_mapper[ip].resize(N_HIST, {});
+        }
+    }
+
     //! read data -> train data -> nc info -> add to feature instances
     void ReadNCInfo(const std::string &file_name_nc_info) {
         std::cout << "read nc infos." << std::endl;
@@ -190,6 +200,32 @@ public:
             }
         }
         fp_train_info.close();
+    }
+
+    //! read data -> exception data -> record hour info
+    void FillExceptionInfo(const std::string &file_name_exception) {
+        std::cout << "FillExceptionInfo" << std::endl;
+        std::ifstream fp_train_exception(file_name_exception);
+        if (!fp_train_exception) {
+            std::cout << "open file failed: " << file_name_exception << std::endl;
+            throw std::runtime_error("open file failed: " + file_name_exception);
+        }
+        std::string line{};
+        std::string nc_ip{};
+        std::getline(fp_train_exception, line);
+        int exception_type;
+        int exception_hour;
+        std::string content{};
+        int i_row = 0;
+        while (!fp_train_exception.eof()) {
+            if ((i_row % 10000) == 0) { std::cout << "fp_exception: " << i_row << std::endl; }
+            i_row++;
+            std::getline(fp_train_exception, line);
+            if (line.empty()) { break; }
+            if (!DataProcess::parse_exception(line, nc_ip, exception_type, exception_hour, content)) { continue; }
+            ip_to_exception_hour_mapper[nc_ip].at(exception_type).push_back(exception_hour);
+        }
+        fp_train_exception.close();
     }
 
     //! read data -> train data -> exception data -> fill into feature
@@ -245,13 +281,12 @@ public:
         featureMaker.WriteToFile(FILE_TRAIN_FEATURE);
     }
 
-    static void make_test_feature() {
+    static void make_test_ip_to_exception_hours() {
         FeatureMaker featureMaker;
-//        FeatureMaker::UpdateNHistWithExceptionFile();
         featureMaker.ReadLabel(FILE_TEST_LABEL);
-        featureMaker.MakeIpToFeaturesMapper();
+        featureMaker.MakeIpToHourListMapper();
         featureMaker.ReadNCInfo(FILE_TEST_INFO);
-        featureMaker.FillExceptionInfoHist(FILE_TEST_EXCEPTION);
+        featureMaker.FillExceptionInfo(FILE_TEST_EXCEPTION);
         featureMaker.WriteToFile(FILE_TEST_FEATURE);
     }
 };
